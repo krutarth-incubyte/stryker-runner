@@ -139,6 +139,18 @@ tasks {
 
 intellijPlatformTesting {
     runIde {
+        register("runWebStorm") {
+            task {
+                jvmArgumentProviders += CommandLineArgumentProvider {
+                    listOf(
+                        "-Didea.platform.prefix=WebStorm",
+                    )
+                }
+            }
+
+            localPath = file("/Applications/WebStorm.app/Contents")
+        }
+
         register("runIdeForUiTests") {
             task {
                 jvmArgumentProviders += CommandLineArgumentProvider {
