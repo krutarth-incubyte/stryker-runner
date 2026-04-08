@@ -17,10 +17,25 @@ class MutantAnnotator : ExternalAnnotator<List<MutantResult>, List<MutantResult>
 
     override fun collectInformation(file: PsiFile, editor: Editor, hasErrors: Boolean): List<MutantResult> {
         val project = file.project
+        val filePath = file.virtualFile?.path ?: return emptyList()
         val service = MutationResultService.getInstance(project)
+
+        // Try cached results first
         val configDir = service.strykerConfigDir
-        val relativePath = resolveRelativePath(configDir, project, file) ?: return emptyList()
-        return service.getSurvivedResultsForFile(relativePath)
+        val relativePath = resolveRelativePath(configDir, project, file)
+        if (relativePath != null) {
+            val cached = service.getSurvivedResultsForFile(relativePath)
+            if (cached.isNotEmpty()) return cached
+        }
+
+        // Auto-discover and load from existing report on disk
+        if (service.tryAutoLoadReport(filePath)) {
+            val newConfigDir = service.strykerConfigDir
+            val newRelativePath = resolveRelativePath(newConfigDir, project, file) ?: return emptyList()
+            return service.getSurvivedResultsForFile(newRelativePath)
+        }
+
+        return emptyList()
     }
 
     override fun doAnnotate(collectedInfo: List<MutantResult>): List<MutantResult> = collectedInfo

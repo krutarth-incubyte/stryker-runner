@@ -161,4 +161,14 @@ class MutationResultServiceTest : BasePlatformTestCase() {
 
         assertNull("strykerConfigDir should be null after clear", service.strykerConfigDir)
     }
+
+    // --- tryAutoLoadReport ---
+
+    fun testTryAutoLoadReturnsFalseWhenNoReportExists() {
+        val fakePath = "/tmp/nonexistent-project-${System.nanoTime()}/src/app.ts"
+
+        val loaded = service.tryAutoLoadReport(fakePath)
+
+        assertFalse("Should return false when no report file exists", loaded)
+    }
 }

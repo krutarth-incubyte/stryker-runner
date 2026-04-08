@@ -36,4 +36,22 @@ object PathUtil {
         }
         return null
     }
+
+    private const val REPORT_RELATIVE_PATH = "reports/mutation/mutation.json"
+
+    fun findNearestReportFile(filePath: String, projectBasePath: String): File? {
+        var dir = File(filePath).let { if (it.isDirectory) it else it.parentFile }
+        val projectRoot = File(projectBasePath).canonicalPath
+        while (dir != null && dir.canonicalPath.startsWith(projectRoot)) {
+            val candidate = File(dir, REPORT_RELATIVE_PATH)
+            if (candidate.exists()) return candidate
+            dir = dir.parentFile
+        }
+        return null
+    }
+
+    fun getReportConfigDir(reportFile: File): String {
+        // The report is at <configDir>/reports/mutation/mutation.json — go up 3 levels
+        return reportFile.parentFile.parentFile.parentFile.canonicalPath
+    }
 }
