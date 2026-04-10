@@ -20,8 +20,7 @@ class FetchCiReportAction : AnAction() {
     override fun getActionUpdateThread(): ActionUpdateThread = ActionUpdateThread.BGT
 
     override fun update(e: AnActionEvent) {
-        val project = e.project
-        e.presentation.isEnabledAndVisible = project != null
+        e.presentation.isEnabledAndVisible = e.project != null
     }
 
     override fun actionPerformed(e: AnActionEvent) {
@@ -57,7 +56,11 @@ class FetchCiReportAction : AnAction() {
                 indicator.isIndeterminate = true
                 indicator.text = StrykerBundle.message("notification.ci.fetching", branch)
 
-                val downloadDir = File(basePath, ".stryker-runner/ci-reports/${branch.replace("/", "_")}")
+                // Single CI report dir — delete previous before downloading
+                val service = MutationResultService.getInstance(project)
+                service.deleteCiReportDir()
+
+                val downloadDir = File(basePath, MutationResultService.CI_REPORT_DIR)
 
                 val result = GitHubArtifactClient.fetchMutationReportForBranch(ownerRepo, branch, downloadDir)
 
@@ -70,24 +73,33 @@ class FetchCiReportAction : AnAction() {
                         }
 
                         if (report != null && report.files.isNotEmpty()) {
-                            // Determine the config dir — look for stryker config near the report,
-                            // or use the report's parent directory structure
                             val configDir = PathUtil.findNearestStrykerConfigDir(
                                 result.reportFile.absolutePath, basePath
                             ) ?: PathUtil.getReportConfigDir(result.reportFile)
 
-                            MutationResultService.getInstance(project).setResults(report.files, configDir)
-
-                            StrykerNotifications.notifyInfo(
-                                project,
-                                StrykerBundle.message("notification.ci.fetch.title"),
-                                StrykerBundle.message(
-                                    "notification.ci.fetch.success",
-                                    result.prNumber,
-                                    report.files.size,
-                                    result.artifactName,
-                                ),
+                            // Use CI run timestamp so local reports don't overwrite it
+                            val loaded = service.setResultsIfNewer(
+                                report.files, configDir, result.runTimestamp
                             )
+
+                            if (loaded) {
+                                StrykerNotifications.notifyInfo(
+                                    project,
+                                    StrykerBundle.message("notification.ci.fetch.title"),
+                                    StrykerBundle.message(
+                                        "notification.ci.fetch.success",
+                                        result.prNumber,
+                                        report.files.size,
+                                        result.artifactName,
+                                    ),
+                                )
+                            } else {
+                                StrykerNotifications.notifyWarning(
+                                    project,
+                                    StrykerBundle.message("notification.ci.fetch.title"),
+                                    StrykerBundle.message("notification.ci.fetch.not.newer"),
+                                )
+                            }
                         } else {
                             StrykerNotifications.notifyWarning(
                                 project,

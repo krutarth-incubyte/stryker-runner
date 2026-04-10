@@ -21,6 +21,11 @@ class MutationResultService(private val project: Project) {
     var strykerConfigDir: String? = null
         private set
 
+    /** Epoch millis of the report currently loaded. 0 means nothing loaded. */
+    @Volatile
+    var reportTimestamp: Long = 0L
+        private set
+
     private val resultsByFile = mutableMapOf<String, List<MutantResult>>()
 
     // Tracks which report files have been auto-loaded, to avoid re-parsing on every file open
@@ -33,17 +38,37 @@ class MutationResultService(private val project: Project) {
     }
 
     fun setResults(results: Map<String, List<MutantResult>>) {
-        setResults(results, null)
+        setResults(results, null, System.currentTimeMillis())
     }
 
     fun setResults(results: Map<String, List<MutantResult>>, configDir: String?) {
+        setResults(results, configDir, System.currentTimeMillis())
+    }
+
+    fun setResults(results: Map<String, List<MutantResult>>, configDir: String?, timestamp: Long) {
         synchronized(resultsByFile) {
             resultsByFile.clear()
             resultsByFile.putAll(results)
             loadedReportPaths.clear()
         }
         strykerConfigDir = configDir
+        reportTimestamp = timestamp
         restartAnalysis()
+    }
+
+    /**
+     * Loads results only if the given timestamp is newer than what's currently loaded.
+     * Used by auto-discovery and CI fetch to avoid overwriting a fresher report.
+     * Returns true if the results were accepted.
+     */
+    fun setResultsIfNewer(
+        results: Map<String, List<MutantResult>>,
+        configDir: String?,
+        timestamp: Long,
+    ): Boolean {
+        if (timestamp <= reportTimestamp) return false
+        setResults(results, configDir, timestamp)
+        return true
     }
 
     fun getResultsForFile(filePath: String): List<MutantResult> =
@@ -60,12 +85,13 @@ class MutationResultService(private val project: Project) {
             loadedReportPaths.clear()
         }
         strykerConfigDir = null
+        reportTimestamp = 0L
         restartAnalysis()
     }
 
     /**
      * Auto-discovers and loads a mutation report from disk for the given file.
-     * Called by the annotator when no cached results exist.
+     * Only loads if the report file is newer than the currently loaded report.
      * Returns true if a report was found and loaded.
      */
     fun tryAutoLoadReport(absoluteFilePath: String): Boolean {
@@ -73,10 +99,14 @@ class MutationResultService(private val project: Project) {
 
         val reportFile = PathUtil.findNearestReportFile(absoluteFilePath, basePath) ?: return false
         val reportPath = reportFile.canonicalPath
+        val fileTimestamp = reportFile.lastModified()
 
         synchronized(resultsByFile) {
             if (reportPath in loadedReportPaths) return false
         }
+
+        // Skip if we already have a newer or equal report loaded
+        if (fileTimestamp <= reportTimestamp) return false
 
         val report = try {
             ReportParser.parse(reportFile)
@@ -86,12 +116,17 @@ class MutationResultService(private val project: Project) {
 
         val configDir = PathUtil.getReportConfigDir(reportFile)
 
-        synchronized(resultsByFile) {
-            loadedReportPaths.add(reportPath)
-            resultsByFile.putAll(report.files)
+        return setResultsIfNewer(report.files, configDir, fileTimestamp).also { loaded ->
+            if (loaded) {
+                synchronized(resultsByFile) { loadedReportPaths.add(reportPath) }
+            }
         }
-        strykerConfigDir = configDir
-        return true
+    }
+
+    /** Deletes the single CI report download directory under .stryker-runner/ci-report/ */
+    fun deleteCiReportDir() {
+        val basePath = project.basePath ?: return
+        File(basePath, CI_REPORT_DIR).deleteRecursively()
     }
 
     private fun restartAnalysis() {
@@ -99,6 +134,8 @@ class MutationResultService(private val project: Project) {
     }
 
     companion object {
+        const val CI_REPORT_DIR = ".stryker-runner/ci-report"
+
         @JvmStatic
         fun getInstance(project: Project): MutationResultService =
             project.getService(MutationResultService::class.java)

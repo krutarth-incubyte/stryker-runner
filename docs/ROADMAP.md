@@ -5,8 +5,8 @@
 ### 1. Mutation Score Summary Panel
 A tool window showing mutation score per file/folder — killed, survived, timeout, no coverage counts. Like a test coverage panel but for mutation testing. We already parse all statuses; just need the UI.
 
-### 2. Clear Annotations Action
-Right-click "Clear Stryker Results" to dismiss annotations when you're done reviewing. Currently they persist until a new run.
+### 2. Clear Annotations Action ✅ Implemented
+"Clear Stryker Results" action in context menu. Clears in-memory results (removes annotations) and deletes `.stryker-runner/ci-report/` from disk. Only visible when results are loaded (`reportTimestamp > 0`).
 
 ### 3. File Watcher for Auto-Refresh
 Watch `mutation.json` for changes — when Stryker finishes (from terminal or CI), annotations update automatically without reopening the file.
@@ -51,6 +51,10 @@ Support PIT (Java/Kotlin), Stryker.NET (C#), mutmut (Python). The architecture a
 
 ### 14. CI Integration ✅ v1 Implemented
 Download and display mutation reports from GitHub Actions PR artifacts without needing a local Stryker run. Manual "Fetch from CI" button.
+
+- Single CI report dir (`.stryker-runner/ci-report/`) — old report deleted before each new fetch
+- Timestamp comparison: CI report (`updated_at`) vs local report (`lastModified`) — newest wins
+- Cleared by "Clear Stryker Results" action
 
 **Future:** Automatic background polling — check every 5 minutes or on branch switch.
 

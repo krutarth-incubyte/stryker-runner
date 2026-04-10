@@ -34,5 +34,12 @@
                 description="Download mutation report from the GitHub Actions PR workflow">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
+        <action id="com.github.nicetester.stryker.action.ClearStrykerResultsAction"
+                class="com.github.nicetester.stryker.action.ClearStrykerResultsAction"
+                text="Clear Stryker Results"
+                icon="/icons/clearStrykerResults.svg"
+                description="Clear mutation annotations and delete downloaded CI report">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
     </actions>
 </idea-plugin>

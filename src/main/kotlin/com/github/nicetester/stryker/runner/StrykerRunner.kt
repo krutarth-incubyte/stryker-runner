@@ -121,7 +121,9 @@ class StrykerRunner(
         try {
             val report = ReportParser.parse(reportFile)
             if (report != null) {
-                MutationResultService.getInstance(project).setResults(report.files, strykerConfigDir)
+                // Use file's last modified time — this is the freshest possible local timestamp
+                val timestamp = reportFile.lastModified().takeIf { it > 0 } ?: System.currentTimeMillis()
+                MutationResultService.getInstance(project).setResults(report.files, strykerConfigDir, timestamp)
             }
         } catch (_: JsonSyntaxException) {
             StrykerNotifications.notifyError(
