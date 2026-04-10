@@ -6,3 +6,4 @@
 .qodana
 build
 .claude/*.local.md
+.stryker-runner/

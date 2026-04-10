@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <!-- Play triangle in bright Stryker crimson for dark theme -->
+  <path d="M4 2.5v11l9-5.5z" fill="#E05555" stroke="#C41E3A" stroke-width="0.5" stroke-linejoin="round"/>
+  <!-- Small mutation dot accent -->
+  <circle cx="12.5" cy="3.5" r="2" fill="#FF6B4A" stroke="#E05555" stroke-width="0.5"/>
+  <text x="12.5" y="4.8" text-anchor="middle" font-size="3.5" font-weight="bold" fill="white" font-family="Arial">M</text>
+</svg>

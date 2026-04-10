@@ -23,7 +23,15 @@
         <action id="com.github.nicetester.stryker.action.RunStrykerAction"
                 class="com.github.nicetester.stryker.action.RunStrykerAction"
                 text="Run Stryker"
+                icon="/icons/runStryker.svg"
                 description="Run Stryker mutation testing on the selected file or folder">
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
+        <action id="com.github.nicetester.stryker.action.FetchCiReportAction"
+                class="com.github.nicetester.stryker.action.FetchCiReportAction"
+                text="Fetch Stryker Results from CI"
+                icon="/icons/fetchCiReport.svg"
+                description="Download mutation report from the GitHub Actions PR workflow">
             <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
         </action>
     </actions>
