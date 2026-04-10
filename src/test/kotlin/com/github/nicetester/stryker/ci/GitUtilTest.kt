@@ -24,6 +24,16 @@ class GitUtilTest : TestCase() {
         assertEquals("owner/repo", result)
     }
 
+    fun testParseOwnerRepoFromOrgAliasSshUrl() {
+        val result = GitUtil.parseOwnerRepo("org-7375850@github.com:healthsparq/listings-management.git")
+        assertEquals("healthsparq/listings-management", result)
+    }
+
+    fun testParseOwnerRepoFromOrgAliasSshUrlWithoutGitSuffix() {
+        val result = GitUtil.parseOwnerRepo("org-12345@github.com:myorg/myrepo")
+        assertEquals("myorg/myrepo", result)
+    }
+
     fun testParseOwnerRepoReturnsNullForNonGithubUrl() {
         val result = GitUtil.parseOwnerRepo("git@gitlab.com:owner/repo.git")
         assertNull(result)

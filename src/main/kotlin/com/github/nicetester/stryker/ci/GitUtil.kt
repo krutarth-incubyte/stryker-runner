@@ -18,13 +18,15 @@ object GitUtil {
     }
 
     fun parseOwnerRepo(remoteUrl: String): String? {
-        // Handles both SSH and HTTPS formats:
-        // git@github.com:owner/repo.git -> owner/repo
-        // https://github.com/owner/repo.git -> owner/repo
-        val sshMatch = Regex("""git@github\.com:(.+/.+?)(?:\.git)?$""").find(remoteUrl.trim())
+        val url = remoteUrl.trim()
+
+        // Standard SSH: git@github.com:owner/repo.git
+        // Org alias SSH: org-12345@github.com:owner/repo.git
+        val sshMatch = Regex("""[^@]+@github\.com:(.+/.+?)(?:\.git)?$""").find(url)
         if (sshMatch != null) return sshMatch.groupValues[1]
 
-        val httpsMatch = Regex("""https://github\.com/(.+/.+?)(?:\.git)?$""").find(remoteUrl.trim())
+        // HTTPS: https://github.com/owner/repo.git
+        val httpsMatch = Regex("""https://github\.com/(.+/.+?)(?:\.git)?$""").find(url)
         if (httpsMatch != null) return httpsMatch.groupValues[1]
 
         return null
