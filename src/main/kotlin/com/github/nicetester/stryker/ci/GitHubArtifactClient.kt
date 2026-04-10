@@ -12,16 +12,6 @@ import java.time.Instant
  */
 object GitHubArtifactClient {
 
-    /**
-     * Finds and downloads the mutation report artifact from the PR associated with the given branch.
-     *
-     * Flow:
-     * 1. Find the PR number for the branch
-     * 2. Get the latest completed workflow run for that PR (with its timestamp)
-     * 3. Find an artifact containing "mutation"/"stryker" in its name
-     * 4. Download and extract it
-     * 5. Return the path to mutation.json + run timestamp for freshness comparison
-     */
     fun fetchMutationReportForBranch(
         ownerRepo: String,
         branch: String,
@@ -44,7 +34,7 @@ object GitHubArtifactClient {
         val downloaded = downloadArtifact(ownerRepo, artifactName, runInfo.id, downloadDir)
             ?: return FetchResult.Error("Failed to download artifact '$artifactName'")
 
-        val mutationJson = findMutationJson(downloaded)
+        val mutationJson = findMutationJsonInDir(downloaded)
             ?: return FetchResult.Error("Downloaded artifact '$artifactName' does not contain a mutation.json file")
 
         return FetchResult.Success(mutationJson, prNumber, artifactName, runInfo.timestamp)
@@ -56,13 +46,13 @@ object GitHubArtifactClient {
         return output.trim().toIntOrNull()
     }
 
-    private data class RunInfo(val id: Long, val timestamp: Long)
+    internal data class RunInfo(val id: Long, val timestamp: Long)
 
-    private fun findLatestWorkflowRun(ownerRepo: String, prNumber: Int): RunInfo? {
-        val runsJson = runGh(
-            "api", "repos/$ownerRepo/actions/runs?event=pull_request&status=completed&per_page=10",
-        ) ?: return null
-
+    /**
+     * Parses the GitHub API workflow runs JSON response to find the latest run for the given PR.
+     * Extracted as `internal` so tests can verify the JSON parsing logic directly.
+     */
+    internal fun parseWorkflowRunsJson(runsJson: String, prNumber: Int): RunInfo? {
         val runs = try {
             JsonParser.parseString(runsJson).asJsonObject.getAsJsonArray("workflow_runs")
         } catch (_: Exception) {
@@ -71,7 +61,7 @@ object GitHubArtifactClient {
 
         for (run in runs) {
             val runObj = run.asJsonObject
-            val pullRequests = runObj.getAsJsonArray("pull_requests")
+            val pullRequests = runObj.getAsJsonArray("pull_requests") ?: continue
             for (pr in pullRequests) {
                 if (pr.asJsonObject.get("number").asInt == prNumber) {
                     val id = runObj.get("id").asLong
@@ -87,9 +77,12 @@ object GitHubArtifactClient {
         return null
     }
 
-    private fun findMutationArtifact(ownerRepo: String, runId: Long): String? {
-        val artifactsJson = runGh("api", "repos/$ownerRepo/actions/runs/$runId/artifacts") ?: return null
-
+    /**
+     * Parses the GitHub API artifacts JSON response to find the first artifact with
+     * "mutation" or "stryker" in its name (case-insensitive).
+     * Extracted as `internal` so tests can verify the matching logic directly.
+     */
+    internal fun parseArtifactsJson(artifactsJson: String): String? {
         val artifacts = try {
             JsonParser.parseString(artifactsJson).asJsonObject.getAsJsonArray("artifacts")
         } catch (_: Exception) {
@@ -106,13 +99,29 @@ object GitHubArtifactClient {
         return null
     }
 
+    /**
+     * Recursively searches a directory for a file named `mutation.json`.
+     * Extracted as `internal` so tests can verify the search logic directly.
+     */
+    internal fun findMutationJsonInDir(dir: File): File? =
+        dir.walkTopDown().find { it.name == "mutation.json" && it.isFile }
+
+    private fun findLatestWorkflowRun(ownerRepo: String, prNumber: Int): RunInfo? {
+        val runsJson = runGh(
+            "api", "repos/$ownerRepo/actions/runs?event=pull_request&status=completed&per_page=10",
+        ) ?: return null
+        return parseWorkflowRunsJson(runsJson, prNumber)
+    }
+
+    private fun findMutationArtifact(ownerRepo: String, runId: Long): String? {
+        val artifactsJson = runGh("api", "repos/$ownerRepo/actions/runs/$runId/artifacts") ?: return null
+        return parseArtifactsJson(artifactsJson)
+    }
+
     private fun downloadArtifact(ownerRepo: String, artifactName: String, runId: Long, downloadDir: File): File? {
         runGh("run", "download", runId.toString(), "--repo", ownerRepo, "--name", artifactName, "--dir", downloadDir.absolutePath)
         return if (downloadDir.exists() && downloadDir.listFiles()?.isNotEmpty() == true) downloadDir else null
     }
-
-    private fun findMutationJson(dir: File): File? =
-        dir.walkTopDown().find { it.name == "mutation.json" && it.isFile }
 
     fun isGhAvailable(): Boolean =
         try {
